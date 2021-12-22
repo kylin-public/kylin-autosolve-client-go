@@ -47,6 +47,7 @@ type AutosolveClient struct {
 	nextRequestId uint64
 	requests      sync.Map
 
+	cancelFunc     context.CancelFunc
 	retryCount     int
 	loginError     bool
 	ticker         *time.Ticker
@@ -514,12 +515,21 @@ func (c *AutosolveClient) connect() error {
 
 	c.addEventListeners()
 	c.ws.IsConnected = false
-	go c.ws.Connect()
+
+	ctx, cancel := context.WithCancel(context.Background())
+
+	c.cancelFunc = cancel
+	go c.ws.ConnectWithContext(ctx)
 	return nil
 }
 
 func (c *AutosolveClient) close() {
 	c.removeEventListeners()
+
+	if c.cancelFunc != nil {
+		c.cancelFunc()
+		c.cancelFunc = nil
+	}
 	c.ws.Close()
 
 	c.stopHeartBeatCheck()
@@ -529,6 +539,11 @@ func (c *AutosolveClient) close() {
 
 func (c *AutosolveClient) _close() {
 	c.removeEventListeners()
+	if c.cancelFunc != nil {
+		c.cancelFunc()
+		c.cancelFunc = nil
+	}
+
 	c.stopHeartBeatCheck()
 
 	c.EE.Emit("Abort")
