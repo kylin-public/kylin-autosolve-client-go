@@ -10,9 +10,9 @@ import (
 	"time"
 
 	ee "github.com/jiyeyuran/go-eventemitter"
-	"github.com/sacOO7/gowebsocket"
 	"google.golang.org/protobuf/proto"
 
+	"github.com/kylin-public/kylin-autosolve-client-go/gowebsocket"
 	"github.com/kylin-public/kylin-autosolve-client-go/protocol"
 )
 
