@@ -166,6 +166,9 @@ func (c *AutosolveClient) WhenReady() error {
 	if c.started && c.loggedIn {
 		return nil
 	}
+	if !c.started {
+		return errors.New("NOT STARTED")
+	}
 	if c.loginError {
 		return errors.New("NOT LOGGED IN")
 	}

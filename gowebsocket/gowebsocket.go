@@ -102,7 +102,9 @@ func (socket *Socket) ConnectWithContext(ctx context.Context) {
 
 	if err != nil {
 		logger.Error.Println("Error while connecting to server ", err)
-		logger.Error.Println(fmt.Sprintf("HTTP Response %d status: %s", resp.StatusCode, resp.Status))
+		if resp != nil {
+			logger.Error.Println(fmt.Sprintf("HTTP Response %d status: %s", resp.StatusCode, resp.Status))
+		}
 		socket.IsConnected = false
 		if socket.OnConnectError != nil {
 			socket.OnConnectError(err, *socket)
@@ -206,6 +208,9 @@ func (socket *Socket) SendBinary(data []byte) error {
 
 func (socket *Socket) send(messageType int, data []byte) error {
 	socket.sendMu.Lock()
+	if socket.Conn == nil {
+		return errors.New("NOT CONNECTED")
+	}
 	err := socket.Conn.WriteMessage(messageType, data)
 	socket.sendMu.Unlock()
 	return err
@@ -213,11 +218,14 @@ func (socket *Socket) send(messageType int, data []byte) error {
 
 // Close closese the websocket
 func (socket *Socket) Close() {
-	err := socket.send(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
-	if err != nil {
-		logger.Error.Println("write close:", err)
+	var err error
+	if socket.Conn != nil {
+		err = socket.send(websocket.CloseMessage, websocket.FormatCloseMessage(websocket.CloseNormalClosure, ""))
+		if err != nil {
+			logger.Error.Println("write close:", err)
+		}
+		_ = socket.Conn.Close()
 	}
-	_ = socket.Conn.Close()
 	if socket.OnDisconnected != nil {
 		socket.IsConnected = false
 		socket.OnDisconnected(err, *socket)
