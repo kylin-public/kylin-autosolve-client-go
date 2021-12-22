@@ -16,18 +16,22 @@ import (
 	"github.com/kylin-public/kylin-autosolve-client-go/protocol"
 )
 
-var kAutosolveUrl = "wss://autosolve-ws.kylinbot.io/ws"
-var kRetryIntervals = []int{1000, 2000, 4000, 8000, 16000}
+var autosolveURL = "wss://autosolve-ws.kylinbot.io/ws"
+var retryIntervals = []int{1000, 2000, 4000, 8000, 16000}
 
+// NotificationTaskResult is the event name for the task result notification
 var NotificationTaskResult = "Notification-" + reflect.TypeOf(&protocol.Notification_TaskResult{}).String()
 
+// ErrorAborted is returned in Invoken() when a call is aborted
 var ErrorAborted = errors.New("THE REQUEST IS ABORTED")
 
+// RemoteError is the errors returned from server
 type RemoteError struct {
 	s    string
 	Code int
 }
 
+// NewRemoteError creates a new remote error
 func NewRemoteError(code int, text string) error {
 	return &RemoteError{text, code}
 }
@@ -36,7 +40,8 @@ func (e *RemoteError) Error() string {
 	return e.s
 }
 
-type AutosolveClient struct {
+// Client provides a client for the kylin autosolve service
+type Client struct {
 	ws gowebsocket.Socket
 
 	AccessToken      string
@@ -44,7 +49,7 @@ type AutosolveClient struct {
 	HeartBeatTimeout int
 
 	EE            ee.IEventEmitter
-	nextRequestId uint64
+	nextRequestID uint64
 	requests      sync.Map
 
 	cancelFunc     context.CancelFunc
@@ -57,25 +62,30 @@ type AutosolveClient struct {
 	loggedIn       bool
 }
 
+// NotificationEvent is the payload object of Notification events
 type NotificationEvent struct {
 	Message      *protocol.Message
 	Notification *protocol.Notification
 	Handled      int
 }
 
+// Param contains a parameter of a POST request
 type Param struct {
 	Name  string `json:"name"`
 	Value string `json:"value"`
 }
 
+// ITaskOptions is a interfaces that represents options of a CreateTaskRequest
 type ITaskOptions interface{}
 
+// InputInfo contains the additional info for the SMS-CODE challenge
 type InputInfo struct {
-	Id         string `json:"id"`
+	ID         string `json:"id"`
 	Timestamp  int64  `json:"timestamp"`
 	InputLabel string `json:"input_label"`
 }
 
+// TaskOptions is the options of create request
 type TaskOptions struct {
 	ITaskOptions `json:"-"`
 
@@ -88,29 +98,32 @@ type TaskOptions struct {
 	Secret             string     `json:"secret,omitempty"`
 	Challenge          string     `json:"challenge,omitempty"`
 	RqData             string     `json:"rqdata,omitempty"`
-	ApiServer          string     `json:"api_server,omitempty"`
-	ActionUrl          string     `json:"action_url,omitempty"`
+	APIServer          string     `json:"api_server,omitempty"`
+	ActionURL          string     `json:"action_url,omitempty"`
 	Method             string     `json:"method,omitempty"`
 	Params             *[]Param   `json:"params,omitempty"`
 	Document           string     `json:"document,omitempty"`
-	CallbackUrlPattern string     `json:"callback_url_pattern,omitempty"`
+	CallbackURLPattern string     `json:"callback_url_pattern,omitempty"`
 	Filters            []string   `json:"filters,omitempty"`
 	Info               *InputInfo `json:"info,omitempty"`
 }
 
+// CreateTaskRequest contains the basic options for a create request
 type CreateTaskRequest struct {
 	ChallengeType string
-	Url           string
+	URL           string
 	Timeout       int
 }
 
+// GetTaskResultRequest contains the basic options for a get request
 type GetTaskResultRequest struct {
-	TaskId string
+	TaskID string
 }
 
+// CancelTaskRequest contains the basic options for a cancel request
 type CancelTaskRequest struct {
 	ChallengeType string
-	TaskId        string
+	TaskID        string
 }
 
 type response struct {
@@ -118,30 +131,40 @@ type response struct {
 	Error   error
 }
 
-func NewAutosolveClient() *AutosolveClient {
-	c := &AutosolveClient{
-		ws:               gowebsocket.New(kAutosolveUrl),
+// New creates a autosolve client
+func New() *Client {
+	c := &Client{
+		ws:               gowebsocket.New(autosolveURL),
 		EE:               ee.NewEventEmitter(),
 		HeartBeatTimeout: 8,
-		nextRequestId:    1000,
+		nextRequestID:    1000,
 	}
 
 	return c
 }
 
-func (c *AutosolveClient) IsConnected() bool {
+// SetURL sets the URL of autosolve service
+func (c *Client) SetURL(url string) {
+	c.ws.URL = url
+}
+
+// IsConnected returns the status of underlying websocket connection
+func (c *Client) IsConnected() bool {
 	return c.ws.IsConnected
 }
 
-func (c *AutosolveClient) IsLoggedIn() bool {
+// IsLoggedIn returns true if this client connected to server and signed in successfully
+func (c *Client) IsLoggedIn() bool {
 	return c.loggedIn
 }
 
-func (c *AutosolveClient) IsStarted() bool {
+// IsStarted returns true if this client has been started
+func (c *Client) IsStarted() bool {
 	return c.started
 }
 
-func (c *AutosolveClient) Start() error {
+// Start connects to kylin autosolve server and signin using provided authorization information
+func (c *Client) Start() error {
 	if c.started {
 		return nil
 	}
@@ -153,7 +176,8 @@ func (c *AutosolveClient) Start() error {
 	return nil
 }
 
-func (c *AutosolveClient) Stop() {
+// Stop disconnects the underlying websocket connection and abort all pending calls
+func (c *Client) Stop() {
 	if c.started {
 		c.started = false
 		c.close()
@@ -162,7 +186,8 @@ func (c *AutosolveClient) Stop() {
 	}
 }
 
-func (c *AutosolveClient) WhenReady() error {
+// WhenReady blocks current routine until this client is stopped or signin is completed
+func (c *Client) WhenReady() error {
 	if c.started && c.loggedIn {
 		return nil
 	}
@@ -205,15 +230,17 @@ func (c *AutosolveClient) WhenReady() error {
 	return result
 }
 
-func (c *AutosolveClient) NextRequestId() uint64 {
-	requestId := atomic.AddUint64(&c.nextRequestId, uint64(1))
-	return requestId
+// NextRequestID returns the next request id
+func (c *Client) NextRequestID() uint64 {
+	requestID := atomic.AddUint64(&c.nextRequestID, uint64(1))
+	return requestID
 }
 
-func (c *AutosolveClient) MakeLoginMessage() *protocol.Message {
+// MakeLoginMessage makes a login request
+func (c *Client) MakeLoginMessage() *protocol.Message {
 	msg := protocol.Message{
 		MessageType: protocol.MessageType_REQUEST,
-		RequestId:   c.NextRequestId(),
+		RequestId:   c.NextRequestID(),
 		Payload: &protocol.Message_Request{
 			Request: &protocol.Request{
 				Payload: &protocol.Request_Login{
@@ -228,7 +255,8 @@ func (c *AutosolveClient) MakeLoginMessage() *protocol.Message {
 	return &msg
 }
 
-func (c *AutosolveClient) MakeErrorMessage(request *protocol.Message, errorCode protocol.ErrorCode, errorMessage string) *protocol.Message {
+// MakeErrorMessage makes an error response
+func (c *Client) MakeErrorMessage(request *protocol.Message, errorCode protocol.ErrorCode, errorMessage string) *protocol.Message {
 	msg := protocol.Message{
 		MessageType: protocol.MessageType_RESPONSE,
 		RequestId:   request.RequestId,
@@ -247,7 +275,8 @@ func (c *AutosolveClient) MakeErrorMessage(request *protocol.Message, errorCode 
 	return &msg
 }
 
-func (c *AutosolveClient) MakePingResponseMessage(request *protocol.Message) *protocol.Message {
+// MakePingResponseMessage makes a ping response
+func (c *Client) MakePingResponseMessage(request *protocol.Message) *protocol.Message {
 	msg := protocol.Message{
 		MessageType: protocol.MessageType_RESPONSE,
 		RequestId:   request.RequestId,
@@ -264,11 +293,12 @@ func (c *AutosolveClient) MakePingResponseMessage(request *protocol.Message) *pr
 	return &msg
 }
 
-func (c *AutosolveClient) MakeCreateTaskMessage(req *CreateTaskRequest, options ITaskOptions) *protocol.Message {
+// MakeCreateTaskMessage makes a create request
+func (c *Client) MakeCreateTaskMessage(req *CreateTaskRequest, options ITaskOptions) *protocol.Message {
 	request := &protocol.CreateTaskRequest{
 		ChallengeType: req.ChallengeType,
 		TimeOut:       int32(req.Timeout),
-		Url:           req.Url,
+		Url:           req.URL,
 	}
 	if options != nil {
 		data, _ := json.Marshal(options)
@@ -278,7 +308,7 @@ func (c *AutosolveClient) MakeCreateTaskMessage(req *CreateTaskRequest, options 
 	}
 	msg := protocol.Message{
 		MessageType: protocol.MessageType_REQUEST,
-		RequestId:   c.NextRequestId(),
+		RequestId:   c.NextRequestID(),
 		Payload: &protocol.Message_Request{
 			Request: &protocol.Request{
 				Payload: &protocol.Request_CreateTask{
@@ -291,15 +321,16 @@ func (c *AutosolveClient) MakeCreateTaskMessage(req *CreateTaskRequest, options 
 	return &msg
 }
 
-func (c *AutosolveClient) MakeGetTaskResultMessage(req *GetTaskResultRequest) *protocol.Message {
+// MakeGetTaskResultMessage makes a get request
+func (c *Client) MakeGetTaskResultMessage(req *GetTaskResultRequest) *protocol.Message {
 	msg := protocol.Message{
 		MessageType: protocol.MessageType_REQUEST,
-		RequestId:   c.NextRequestId(),
+		RequestId:   c.NextRequestID(),
 		Payload: &protocol.Message_Request{
 			Request: &protocol.Request{
 				Payload: &protocol.Request_GetTaskResult{
 					GetTaskResult: &protocol.GetTaskResultRequest{
-						TaskId: req.TaskId,
+						TaskId: req.TaskID,
 					},
 				},
 			},
@@ -308,16 +339,17 @@ func (c *AutosolveClient) MakeGetTaskResultMessage(req *GetTaskResultRequest) *p
 	return &msg
 }
 
-func (c *AutosolveClient) MakeCancelTaskMessage(req *CancelTaskRequest) *protocol.Message {
+// MakeCancelTaskMessage makes a cancel request
+func (c *Client) MakeCancelTaskMessage(req *CancelTaskRequest) *protocol.Message {
 	msg := protocol.Message{
 		MessageType: protocol.MessageType_REQUEST,
-		RequestId:   c.NextRequestId(),
+		RequestId:   c.NextRequestID(),
 		Payload: &protocol.Message_Request{
 			Request: &protocol.Request{
 				Payload: &protocol.Request_CancelTask{
 					CancelTask: &protocol.CancelTaskRequest{
 						ChallengeType: req.ChallengeType,
-						TaskId:        req.TaskId,
+						TaskId:        req.TaskID,
 					},
 				},
 			},
@@ -326,7 +358,8 @@ func (c *AutosolveClient) MakeCancelTaskMessage(req *CancelTaskRequest) *protoco
 	return &msg
 }
 
-func (c *AutosolveClient) SendMessage(msg *protocol.Message) error {
+// SendMessage sends a message to server
+func (c *Client) SendMessage(msg *protocol.Message) error {
 	data, err := proto.Marshal(msg)
 	if err == nil {
 		err = c.ws.SendBinary(data)
@@ -334,23 +367,24 @@ func (c *AutosolveClient) SendMessage(msg *protocol.Message) error {
 	return err
 }
 
-func (c *AutosolveClient) Invoke(context context.Context, message *protocol.Message) (*protocol.Message, error) {
+// Invoke sends a request to server and blocks the current routine for a response from server
+func (c *Client) Invoke(context context.Context, message *protocol.Message) (*protocol.Message, error) {
 	if !c.IsConnected() {
 		return nil, errors.New("NOT CONNECTED")
 	}
 
 	if message.RequestId == 0 {
-		message.RequestId = c.NextRequestId()
+		message.RequestId = c.NextRequestID()
 	}
 
-	requestId := message.RequestId
+	requestID := message.RequestId
 	msg, err := proto.Marshal(message)
 	if err != nil {
 		return nil, err
 	}
 
 	responseChan := make(chan response)
-	c.requests.Store(requestId, responseChan)
+	c.requests.Store(requestID, responseChan)
 
 	listener := func() {
 		responseChan <- response{
@@ -360,7 +394,7 @@ func (c *AutosolveClient) Invoke(context context.Context, message *protocol.Mess
 	c.EE.Once("Abort", listener)
 
 	defer (func() {
-		c.requests.Delete(requestId)
+		c.requests.Delete(requestID)
 		c.EE.Off("Abort", listener)
 	})()
 	err = c.ws.SendBinary(msg)
@@ -377,7 +411,7 @@ func (c *AutosolveClient) Invoke(context context.Context, message *protocol.Mess
 	}
 }
 
-func (c *AutosolveClient) addEventListeners() {
+func (c *Client) addEventListeners() {
 	c.ws.OnConnected = func(_ gowebsocket.Socket) {
 		go (func() {
 			if !c.started {
@@ -423,7 +457,7 @@ func (c *AutosolveClient) addEventListeners() {
 				c._close()
 
 				c.retryCount++
-				sleepTime := kRetryIntervals[c.retryCount]
+				sleepTime := retryIntervals[c.retryCount]
 				time.Sleep(time.Duration(sleepTime) * time.Millisecond)
 				if c.started {
 					c.connect()
@@ -446,14 +480,14 @@ func (c *AutosolveClient) addEventListeners() {
 	}
 }
 
-func (c *AutosolveClient) removeEventListeners() {
+func (c *Client) removeEventListeners() {
 	c.ws.OnConnected = nil
 	c.ws.OnConnectError = nil
 	c.ws.OnDisconnected = nil
 	c.ws.OnBinaryMessage = nil
 }
 
-func (c *AutosolveClient) onNotification(msg *protocol.Message) {
+func (c *Client) onNotification(msg *protocol.Message) {
 	evt := NotificationEvent{
 		Message:      msg,
 		Notification: msg.GetNotification(),
@@ -472,7 +506,7 @@ func (c *AutosolveClient) onNotification(msg *protocol.Message) {
 	}
 }
 
-func (c *AutosolveClient) onResponse(msg *protocol.Message) {
+func (c *Client) onResponse(msg *protocol.Message) {
 	if responseChan, ok := c.requests.Load(msg.RequestId); ok {
 
 		if ch, ok := responseChan.(chan response); ok {
@@ -489,7 +523,7 @@ func (c *AutosolveClient) onResponse(msg *protocol.Message) {
 	}
 }
 
-func (c *AutosolveClient) onRequest(requestMsg *protocol.Message) {
+func (c *Client) onRequest(requestMsg *protocol.Message) {
 	if requestMsg.GetRequest() != nil {
 		switch requestMsg.GetRequest().Payload.(type) {
 		case *protocol.Request_Ping:
@@ -505,7 +539,7 @@ func (c *AutosolveClient) onRequest(requestMsg *protocol.Message) {
 	}
 }
 
-func (c *AutosolveClient) connect() error {
+func (c *Client) connect() error {
 	if c.AccessToken == "" || c.ClientKey == "" {
 		return errors.New("INVALID ACCESS TOKEN OR CLIENT KEY")
 	}
@@ -526,7 +560,7 @@ func (c *AutosolveClient) connect() error {
 	return nil
 }
 
-func (c *AutosolveClient) close() {
+func (c *Client) close() {
 	c.removeEventListeners()
 
 	if c.cancelFunc != nil {
@@ -540,7 +574,7 @@ func (c *AutosolveClient) close() {
 	c.EE.Emit("Abort")
 }
 
-func (c *AutosolveClient) _close() {
+func (c *Client) _close() {
 	c.removeEventListeners()
 	if c.cancelFunc != nil {
 		c.cancelFunc()
@@ -552,7 +586,7 @@ func (c *AutosolveClient) _close() {
 	c.EE.Emit("Abort")
 }
 
-func (c *AutosolveClient) startHeartBeatCheck() {
+func (c *Client) startHeartBeatCheck() {
 	c.ticker = time.NewTicker(10 * time.Second)
 	c.tickerChan = make(chan byte, 1)
 	go func() {
@@ -573,7 +607,7 @@ func (c *AutosolveClient) startHeartBeatCheck() {
 	}()
 }
 
-func (c *AutosolveClient) stopHeartBeatCheck() {
+func (c *Client) stopHeartBeatCheck() {
 	if c.ticker == nil {
 		return
 	}

@@ -9,7 +9,7 @@ import (
 	as "github.com/kylin-public/kylin-autosolve-client-go"
 )
 
-var kClientKey = "w8mp5inwszowft3kyc"
+var clientKey = "w8mp5inwszowft3kyc"
 
 func main() {
 	accessToken := flag.String("token", "", "the access token")
@@ -20,15 +20,15 @@ func main() {
 		return
 	}
 
-	client := as.NewAutosolveClient()
+	client := as.New()
 	client.AccessToken = *accessToken
-	client.ClientKey = kClientKey
+	client.ClientKey = clientKey
 
 	client.Start()
 	if client.WhenReady() == nil {
 		response, err := client.Invoke(context.Background(), client.MakeCreateTaskMessage(&as.CreateTaskRequest{
 			ChallengeType: "google",
-			Url:           "https://recaptcha-test.kylinbot.io/",
+			URL:           "https://recaptcha-test.kylinbot.io/",
 		}, &as.TaskOptions{
 			SiteKey: "6Lfv-q0ZAAAAADy0U9JUaCPCZI15U-7jhbAiYa0U",
 			Version: "3",
@@ -41,7 +41,7 @@ func main() {
 
 			for i := 0; i < 10; i++ {
 				result, err := client.Invoke(context.Background(), client.MakeGetTaskResultMessage(&as.GetTaskResultRequest{
-					TaskId: response.GetResponse().GetCreateTask().TaskId,
+					TaskID: response.GetResponse().GetCreateTask().TaskId,
 				}))
 				if err != nil {
 					fmt.Println("could not get task result:", err.Error())
