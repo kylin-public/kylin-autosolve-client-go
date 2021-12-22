@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/gorilla/websocket"
+
 	logging "github.com/kylin-public/kylin-autosolve-client-go/go-logger"
 )
 
@@ -192,21 +193,15 @@ func (socket *Socket) ConnectWithContext(ctx context.Context) {
 }
 
 // SendText sends a test message to the server
-func (socket *Socket) SendText(message string) {
+func (socket *Socket) SendText(message string) error {
 	err := socket.send(websocket.TextMessage, []byte(message))
-	if err != nil {
-		logger.Error.Println("write:", err)
-		return
-	}
+	return err
 }
 
 // SendBinary sends a binary message to the websocket
-func (socket *Socket) SendBinary(data []byte) {
+func (socket *Socket) SendBinary(data []byte) error {
 	err := socket.send(websocket.BinaryMessage, data)
-	if err != nil {
-		logger.Error.Println("write:", err)
-		return
-	}
+	return err
 }
 
 func (socket *Socket) send(messageType int, data []byte) error {

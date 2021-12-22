@@ -325,7 +325,7 @@ func (c *AutosolveClient) MakeCancelTaskMessage(req *CancelTaskRequest) *protoco
 func (c *AutosolveClient) SendMessage(msg *protocol.Message) error {
 	data, err := proto.Marshal(msg)
 	if err == nil {
-		c.ws.SendBinary(data)
+		err = c.ws.SendBinary(data)
 	}
 	return err
 }
@@ -359,7 +359,10 @@ func (c *AutosolveClient) Invoke(context context.Context, message *protocol.Mess
 		c.requests.Delete(requestId)
 		c.EE.Off("Abort", listener)
 	})()
-	c.ws.SendBinary(msg)
+	err = c.ws.SendBinary(msg)
+	if err != nil {
+		return nil, err
+	}
 
 	select {
 	case <-context.Done():
