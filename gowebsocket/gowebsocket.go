@@ -98,7 +98,7 @@ func (socket *Socket) ConnectWithContext(ctx context.Context) {
 	var resp *http.Response
 	socket.setConnectionOptions()
 
-	socket.Conn, resp, err = socket.WebsocketDialer.Dial(socket.URL, socket.RequestHeader)
+	socket.Conn, resp, err = socket.WebsocketDialer.DialContext(ctx, socket.URL, socket.RequestHeader)
 
 	if err != nil {
 		logger.Error.Println("Error while connecting to server ", err)
