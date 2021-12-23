@@ -80,9 +80,9 @@ type ITaskOptions interface{}
 
 // InputInfo contains the additional info for the SMS-CODE challenge
 type InputInfo struct {
-	ID         string `json:"id"`
-	Timestamp  int64  `json:"timestamp"`
-	InputLabel string `json:"input_label"`
+	ID         string `json:"id,omitempty"`
+	Timestamp  int64  `json:"timestamp,omitempty"`
+	InputLabel string `json:"input_label,omitempty"`
 }
 
 // TaskOptions is the options of create request
