@@ -82,6 +82,7 @@ type ITaskOptions interface{}
 type InputInfo struct {
 	ID         string `json:"id,omitempty"`
 	Timestamp  int64  `json:"timestamp,omitempty"`
+	InputName  string `json:"input_name,omitempty"`
 	InputLabel string `json:"input_label,omitempty"`
 }
 
