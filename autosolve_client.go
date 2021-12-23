@@ -188,6 +188,11 @@ func (c *Client) Stop() {
 
 // WhenReady blocks current routine until this client is stopped or signin is completed
 func (c *Client) WhenReady() error {
+	return c.WhenReadyWithContext(context.Background())
+}
+
+// WhenReadyWithContext blocks current routine until this client is stopped or signin is completed
+func (c *Client) WhenReadyWithContext(ctx context.Context) error {
 	if c.started && c.loggedIn {
 		return nil
 	}
@@ -213,7 +218,16 @@ func (c *Client) WhenReady() error {
 	c.EE.Once("LoginError", listener)
 	c.EE.Once("Closed", listener)
 
-	<-ch
+	select {
+	case <-ch:
+		break
+
+	case <-ctx.Done():
+		if result == nil {
+			result = ctx.Err()
+		}
+		break
+	}
 
 	c.EE.RemoveListener("Login", listener)
 	c.EE.RemoveListener("LoginError", listener)
