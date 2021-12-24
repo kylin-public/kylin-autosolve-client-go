@@ -22,8 +22,17 @@ var retryIntervals = []int{1000, 2000, 4000, 8000, 16000}
 // NotificationTaskResult is the event name for the task result notification
 var NotificationTaskResult = "Notification-" + reflect.TypeOf(&protocol.Notification_TaskResult{}).String()
 
-// ErrorAborted is returned in Invoken() when a call is aborted
-var ErrorAborted = errors.New("THE REQUEST IS ABORTED")
+// ErrorAborted is returned in Invoke() when a call is aborted
+var ErrorAborted = errors.New("the request is aborted")
+
+// ErrorNotConnected is returned in Invoke() when the underlying websocket is disconnected
+var ErrorNotConnected = errors.New("can't make a call when not connected")
+
+// ErrorLogin is returned when login failed
+var ErrorLogin = errors.New("unable to log in to the server")
+
+// ErrorNoAuthorizationInfo is returned in Start() when required authroization info is missing
+var ErrorNoAuthorizationInfo = errors.New("authroization info is required")
 
 // RemoteError is the errors returned from server
 type RemoteError struct {
@@ -198,10 +207,10 @@ func (c *Client) WhenReadyWithContext(ctx context.Context) error {
 		return nil
 	}
 	if !c.started {
-		return errors.New("NOT STARTED")
+		return ErrorNotConnected
 	}
 	if c.loginError {
-		return errors.New("NOT LOGGED IN")
+		return ErrorLogin
 	}
 
 	var result error
@@ -236,7 +245,7 @@ func (c *Client) WhenReadyWithContext(ctx context.Context) error {
 
 	if result == nil {
 		if !c.started {
-			return errors.New("ALREADY STOPPED")
+			return ErrorNotConnected
 		}
 		if c.started && c.loggedIn {
 			return nil
@@ -385,7 +394,7 @@ func (c *Client) SendMessage(msg *protocol.Message) error {
 // Invoke sends a request to server and blocks the current routine for a response from server
 func (c *Client) Invoke(context context.Context, message *protocol.Message) (*protocol.Message, error) {
 	if !c.IsConnected() {
-		return nil, errors.New("NOT CONNECTED")
+		return nil, ErrorNotConnected
 	}
 
 	if message.RequestId == 0 {
@@ -442,7 +451,7 @@ func (c *Client) addEventListeners() {
 					c.EE.Emit("Login")
 				} else {
 					c.loginError = true
-					c.EE.Emit("LoginError", errors.New("COULD NOT LOGIN"))
+					c.EE.Emit("LoginError", ErrorLogin)
 				}
 			} else {
 				c.loginError = true
@@ -556,7 +565,7 @@ func (c *Client) onRequest(requestMsg *protocol.Message) {
 
 func (c *Client) connect() error {
 	if c.AccessToken == "" || c.ClientKey == "" {
-		return errors.New("INVALID ACCESS TOKEN OR CLIENT KEY")
+		return ErrorNoAuthorizationInfo
 	}
 	if c.ws.IsConnected {
 		return nil
