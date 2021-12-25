@@ -61,6 +61,7 @@ type Client struct {
 	nextRequestID uint64
 	requests      sync.Map
 
+	mutex          sync.Mutex
 	cancelFunc     context.CancelFunc
 	retryCount     int
 	loginError     bool
@@ -564,6 +565,9 @@ func (c *Client) onRequest(requestMsg *protocol.Message) {
 }
 
 func (c *Client) connect() error {
+	c.mutex.Lock()
+	defer c.mutex.Unlock()
+
 	if c.AccessToken == "" || c.ClientKey == "" {
 		return ErrorNoAuthorizationInfo
 	}
@@ -585,27 +589,37 @@ func (c *Client) connect() error {
 }
 
 func (c *Client) close() {
-	c.removeEventListeners()
+	(func() {
+		c.mutex.Lock()
+		defer c.mutex.Unlock()
 
-	if c.cancelFunc != nil {
-		c.cancelFunc()
-		c.cancelFunc = nil
-	}
-	c.ws.Close()
+		c.removeEventListeners()
 
-	c.stopHeartBeatCheck()
+		if c.cancelFunc != nil {
+			c.cancelFunc()
+			c.cancelFunc = nil
+		}
+		c.ws.Close()
+
+		c.stopHeartBeatCheck()
+	})()
 
 	c.EE.Emit("Abort")
 }
 
 func (c *Client) _close() {
-	c.removeEventListeners()
-	if c.cancelFunc != nil {
-		c.cancelFunc()
-		c.cancelFunc = nil
-	}
+	(func() {
+		c.mutex.Lock()
+		defer c.mutex.Unlock()
 
-	c.stopHeartBeatCheck()
+		c.removeEventListeners()
+		if c.cancelFunc != nil {
+			c.cancelFunc()
+			c.cancelFunc = nil
+		}
+
+		c.stopHeartBeatCheck()
+	})()
 
 	c.EE.Emit("Abort")
 }
