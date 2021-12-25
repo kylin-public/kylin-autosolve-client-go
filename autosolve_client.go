@@ -101,8 +101,6 @@ type InputInfo struct {
 
 // TaskOptions is the options of create request
 type TaskOptions struct {
-	ITaskOptions `json:"-"`
-
 	Type               string     `json:"type,omitempty"`
 	SiteKey            string     `json:"site_key,omitempty"`
 	Version            string     `json:"version,omitempty"`
