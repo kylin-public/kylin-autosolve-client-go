@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"sync"
@@ -117,6 +118,13 @@ func main() {
 			fmt.Println("could not create task:", err.Error())
 		} else {
 			fmt.Println("task result:", result)
+
+			if result != nil && result.Token != "" {
+				var token interface{}
+				if json.Unmarshal([]byte(result.Token), &token) == nil {
+					fmt.Println("token:", token)
+				}
+			}
 		}
 	}
 
