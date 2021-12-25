@@ -61,6 +61,10 @@ func (s *AutosolveService) Solve(ctx context.Context, req *as.CreateTaskRequest,
 		return nil, err
 	}
 
+	// Theoretically, it's possible that we have received the result and dropped it already.
+	// But I don't think that will happen in the real world.
+	// One possible solution is to buffer the result in the NotificationTaskResult handler,
+	// and then add a check bellow to return ealierly just before entering the waiting loop.
 	taskID := response.GetResponse().GetCreateTask().TaskId
 	ch := make(chan *protocol.TaskResultNotification, 1)
 	s.results.Store(taskID, ch)
