@@ -23,16 +23,16 @@ var retryIntervals = []int{1000, 2000, 4000, 8000, 16000}
 var NotificationTaskResult = "Notification-" + reflect.TypeOf(&protocol.Notification_TaskResult{}).String()
 
 // ErrorAborted is returned in Invoke() when a call is aborted
-var ErrorAborted = errors.New("the request is aborted")
+var ErrorAborted = errors.New("autosolve: the request is aborted")
 
 // ErrorNotConnected is returned in Invoke() when the underlying websocket is disconnected
-var ErrorNotConnected = errors.New("can't make a call when not connected")
+var ErrorNotConnected = errors.New("autosolve: can't make a call when not connected")
 
 // ErrorLogin is returned when login failed
-var ErrorLogin = errors.New("unable to log in to the server")
+var ErrorLogin = errors.New("autosolve: unable to log in to the server")
 
 // ErrorNoAuthorizationInfo is returned in Start() but required authroization info is missing
-var ErrorNoAuthorizationInfo = errors.New("authroization info is required")
+var ErrorNoAuthorizationInfo = errors.New("autosolve: authroization info is missing")
 
 // RemoteError is the errors returned from server
 type RemoteError struct {
