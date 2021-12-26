@@ -17,7 +17,17 @@ type AutosolveService struct {
 	Client      *as.Client
 	AccessToken string
 
-	results sync.Map
+	results        sync.Map
+	mutex          sync.Mutex
+	buffered       map[string]*protocol.TaskResultNotification
+	bufferingCount int
+}
+
+func NewAutosolveService(accessToken string) *AutosolveService {
+	return &AutosolveService{
+		AccessToken: accessToken,
+		buffered:    make(map[string]*protocol.TaskResultNotification),
+	}
 }
 
 func (s *AutosolveService) Initialize() {
@@ -35,6 +45,8 @@ func (s *AutosolveService) Initialize() {
 							if ch, ok := value.(chan *protocol.TaskResultNotification); ok {
 								ch <- taskResult
 							}
+						} else {
+							s.bufferResult(taskResult.TaskId, taskResult)
 						}
 					}
 				}
@@ -51,23 +63,76 @@ func (s *AutosolveService) Start() {
 	s.Client.Start()
 }
 
+func (s *AutosolveService) enableBuffering() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	s.bufferingCount++
+}
+
+func (s *AutosolveService) disableBuffering() {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if s.bufferingCount > 0 {
+		s.bufferingCount--
+		if s.bufferingCount == 0 {
+			for k := range s.buffered {
+				delete(s.buffered, k)
+			}
+		}
+	}
+}
+
+func (s *AutosolveService) bufferResult(taskID string, result *protocol.TaskResultNotification) {
+	s.mutex.Lock()
+	defer s.mutex.Unlock()
+
+	if s.bufferingCount > 0 {
+		s.buffered[taskID] = result
+	}
+}
+
 func (s *AutosolveService) Solve(ctx context.Context, req *as.CreateTaskRequest, options as.ITaskOptions) (*protocol.TaskResultNotification, error) {
 	err := s.Client.WhenReadyWithContext(ctx)
 	if err != nil {
 		return nil, err
 	}
-	response, err := s.Client.Invoke(ctx, s.Client.MakeCreateTaskMessage(req, options))
+
+	ch := make(chan *protocol.TaskResultNotification, 1)
+	response, result, err := func() (*protocol.Message, *protocol.TaskResultNotification, error) {
+		s.enableBuffering()
+		defer s.disableBuffering()
+
+		response, err := s.Client.Invoke(ctx, s.Client.MakeCreateTaskMessage(req, options))
+		if err != nil {
+			return response, nil, err
+		}
+
+		taskID := response.GetResponse().GetCreateTask().TaskId
+
+		s.mutex.Lock()
+
+		buffered := s.buffered[taskID]
+		if buffered != nil {
+			delete(s.buffered, taskID)
+		} else {
+			s.results.Store(taskID, ch)
+		}
+
+		s.mutex.Unlock()
+
+		return response, buffered, err
+	}()
 	if err != nil {
 		return nil, err
 	}
 
-	// Theoretically, it's possible that we have received the result and dropped it already.
-	// But I don't think that will happen in the real world.
-	// One possible solution is to buffer the result in the NotificationTaskResult handler,
-	// and then add a check bellow to return ealierly just before entering the waiting loop.
+	if result != nil {
+		return result, nil
+	}
+
 	taskID := response.GetResponse().GetCreateTask().TaskId
-	ch := make(chan *protocol.TaskResultNotification, 1)
-	s.results.Store(taskID, ch)
 
 	select {
 	case result := <-ch:
@@ -98,9 +163,7 @@ func main() {
 		return
 	}
 
-	service := AutosolveService{
-		AccessToken: *accessToken,
-	}
+	service := NewAutosolveService(*accessToken)
 
 	service.Start()
 
