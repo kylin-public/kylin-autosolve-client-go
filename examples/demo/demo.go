@@ -90,6 +90,7 @@ func (s *AutosolveService) Stop() {
 
 func main() {
 	accessToken := flag.String("token", "", "the access token")
+	n := flag.Int("n", 1, "the number of challenges to solve")
 	flag.Parse()
 
 	if accessToken == nil || *accessToken == "" {
@@ -132,11 +133,11 @@ func main() {
 		}
 	}
 
-	for i := 0; i < 3; i++ {
+	for i := 0; i < *n; i++ {
 		go demo()
 	}
 
-	for i := 0; i < 3; i++ {
+	for i := 0; i < *n; i++ {
 		<-doneCh
 	}
 
