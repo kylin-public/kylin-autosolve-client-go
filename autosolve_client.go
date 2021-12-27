@@ -477,7 +477,7 @@ func (c *Client) Invoke(context context.Context, message *protocol.Message) (*pr
 }
 
 func (c *Client) addEventListeners() {
-	c.ws.OnConnected = func(_ gowebsocket.Socket) {
+	c.ws.OnConnected = func(_ *gowebsocket.Socket) {
 		go (func() {
 			if !c.IsStarted() {
 				return
@@ -496,7 +496,7 @@ func (c *Client) addEventListeners() {
 			}
 		})()
 	}
-	c.ws.OnDisconnected = func(err error, _ gowebsocket.Socket) {
+	c.ws.OnDisconnected = func(err error, _ *gowebsocket.Socket) {
 		if c.IsStarted() {
 			c.EE.Emit("Disconnected", err)
 
@@ -511,7 +511,7 @@ func (c *Client) addEventListeners() {
 			})()
 		}
 	}
-	c.ws.OnConnectError = func(err error, _ gowebsocket.Socket) {
+	c.ws.OnConnectError = func(err error, _ *gowebsocket.Socket) {
 		if c.IsStarted() {
 			c.EE.Emit("ConnectError", err)
 
@@ -543,7 +543,7 @@ func (c *Client) addEventListeners() {
 		}
 	}
 
-	c.ws.OnBinaryMessage = func(data []byte, _ gowebsocket.Socket) {
+	c.ws.OnBinaryMessage = func(data []byte, _ *gowebsocket.Socket) {
 		msg := protocol.Message{}
 		proto.Unmarshal(data, &msg)
 

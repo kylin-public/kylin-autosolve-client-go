@@ -25,19 +25,19 @@ func main() {
 	socket.RequestHeader.Set("Pragma", "no-cache")
 	socket.RequestHeader.Set("User-Agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/49.0.2623.87 Safari/537.36")
 
-	socket.OnConnectError = func(err error, _ gowebsocket.Socket) {
+	socket.OnConnectError = func(err error, _ *gowebsocket.Socket) {
 		log.Fatal("Received connect error ", err)
 	}
-	socket.OnConnected = func(_ gowebsocket.Socket) {
+	socket.OnConnected = func(_ *gowebsocket.Socket) {
 		log.Println("Connected to server")
 	}
-	socket.OnTextMessage = func(message string, _ gowebsocket.Socket) {
+	socket.OnTextMessage = func(message string, _ *gowebsocket.Socket) {
 		log.Println("Received message  " + message)
 	}
-	socket.OnPingReceived = func(data string, _ gowebsocket.Socket) {
+	socket.OnPingReceived = func(data string, _ *gowebsocket.Socket) {
 		log.Println("Received ping " + data)
 	}
-	socket.OnDisconnected = func(_ error, _ gowebsocket.Socket) {
+	socket.OnDisconnected = func(_ error, _ *gowebsocket.Socket) {
 		log.Println("Disconnected from server ")
 	}
 	socket.Connect()

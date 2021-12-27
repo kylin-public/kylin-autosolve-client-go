@@ -38,13 +38,13 @@ type Socket struct {
 	URL               string
 	ConnectionOptions ConnectionOptions
 	RequestHeader     http.Header
-	OnConnected       func(socket Socket)
-	OnTextMessage     func(message string, socket Socket)
-	OnBinaryMessage   func(data []byte, socket Socket)
-	OnConnectError    func(err error, socket Socket)
-	OnDisconnected    func(err error, socket Socket)
-	OnPingReceived    func(data string, socket Socket)
-	OnPongReceived    func(data string, socket Socket)
+	OnConnected       func(socket *Socket)
+	OnTextMessage     func(message string, socket *Socket)
+	OnBinaryMessage   func(data []byte, socket *Socket)
+	OnConnectError    func(err error, socket *Socket)
+	OnDisconnected    func(err error, socket *Socket)
+	OnPingReceived    func(data string, socket *Socket)
+	OnPongReceived    func(data string, socket *Socket)
 	IsConnected       bool
 	Timeout           time.Duration
 	sendMu            *sync.Mutex // Prevent "concurrent write to websocket connection"
@@ -107,7 +107,7 @@ func (socket *Socket) ConnectWithContext(ctx context.Context) {
 		}
 		socket.IsConnected = false
 		if socket.OnConnectError != nil {
-			socket.OnConnectError(err, *socket)
+			socket.OnConnectError(err, socket)
 		}
 		return
 	}
@@ -116,14 +116,14 @@ func (socket *Socket) ConnectWithContext(ctx context.Context) {
 
 	if socket.OnConnected != nil {
 		socket.IsConnected = true
-		socket.OnConnected(*socket)
+		socket.OnConnected(socket)
 	}
 
 	defaultPingHandler := socket.Conn.PingHandler()
 	socket.Conn.SetPingHandler(func(appData string) error {
 		logger.Trace.Println("Received PING from server")
 		if socket.OnPingReceived != nil {
-			socket.OnPingReceived(appData, *socket)
+			socket.OnPingReceived(appData, socket)
 		}
 		return defaultPingHandler(appData)
 	})
@@ -132,7 +132,7 @@ func (socket *Socket) ConnectWithContext(ctx context.Context) {
 	socket.Conn.SetPongHandler(func(appData string) error {
 		logger.Trace.Println("Received PONG from server")
 		if socket.OnPongReceived != nil {
-			socket.OnPongReceived(appData, *socket)
+			socket.OnPongReceived(appData, socket)
 		}
 		return defaultPongHandler(appData)
 	})
@@ -143,7 +143,7 @@ func (socket *Socket) ConnectWithContext(ctx context.Context) {
 		logger.Warning.Println("Disconnected from server ", result)
 		if socket.OnDisconnected != nil {
 			socket.IsConnected = false
-			socket.OnDisconnected(errors.New(text), *socket)
+			socket.OnDisconnected(errors.New(text), socket)
 		}
 		return result
 	})
@@ -173,7 +173,7 @@ func (socket *Socket) ConnectWithContext(ctx context.Context) {
 					logger.Error.Println(fmt.Sprintf("read: %s", err))
 					if socket.OnDisconnected != nil {
 						socket.IsConnected = false
-						socket.OnDisconnected(err, *socket)
+						socket.OnDisconnected(err, socket)
 					}
 					return
 				}
@@ -182,11 +182,11 @@ func (socket *Socket) ConnectWithContext(ctx context.Context) {
 				switch messageType {
 				case websocket.TextMessage:
 					if socket.OnTextMessage != nil {
-						socket.OnTextMessage(string(message), *socket)
+						socket.OnTextMessage(string(message), socket)
 					}
 				case websocket.BinaryMessage:
 					if socket.OnBinaryMessage != nil {
-						socket.OnBinaryMessage(message, *socket)
+						socket.OnBinaryMessage(message, socket)
 					}
 				}
 			}
@@ -228,6 +228,6 @@ func (socket *Socket) Close() {
 	}
 	if socket.OnDisconnected != nil {
 		socket.IsConnected = false
-		socket.OnDisconnected(err, *socket)
+		socket.OnDisconnected(err, socket)
 	}
 }
