@@ -432,7 +432,7 @@ func (c *Client) SendMessage(msg *protocol.Message) error {
 	return err
 }
 
-// Invoke sends a request to server and blocks the current routine until a response is received
+// Invoke sends the request to server and blocks the current routine until corresponding response is received
 func (c *Client) Invoke(context context.Context, message *protocol.Message) (*protocol.Message, error) {
 	if !c.IsConnected() {
 		return nil, ErrorNotConnected
